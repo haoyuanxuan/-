@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管理考试与成绩 - 学生成绩管理系统</title>
+    <style>
+        :root { --primary-color: #2196F3; }
+        body { font-family: 'Microsoft YaHei', sans-serif; background-color: #f5f5f5; padding: 20px; }
+        .container { max-width: 1000px; margin: 0 auto; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); padding: 20px; }
+        h1, h2 { color: #333; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 20px; }
+        .section { margin-top: 30px; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        input, select { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; border: none; padding: 10px 15px; border-radius: 4px; cursor: pointer; font-size: 16px; margin-right: 10px; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background-color: var(--primary-color); }
+        button.danger { background-color: #f44336; }
+        #notification { padding: 15px; border-radius: 4px; color: #fff; text-align: center; font-weight: bold; margin: 20px 0; display: none; }
+        #notification.success { background-color: #4CAF50; }
+        #notification.error { background-color: #f44336; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f8f8; cursor: pointer; }
+        tr:hover { background-color: #f5f5f5; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 95%; max-width: 900px; max-height: 90vh; overflow: auto; }
+        .modal-footer { margin-top: 20px; text-align: right; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header><h1>管理考试与成绩</h1></header>
+        <p>当前学期: <strong id="currentSemesterText"></strong></p>
+        <div id="notification"></div>
+
+        <div class="section">
+            <h2>通过文件批量导入成绩</h2>
+            <p>支持 <strong>.xls, .xlsx, .csv</strong> 格式。文件内必须包含 "姓名" 和 "排名" 列。"总分" 列为可选。</p>
+            <div class="form-group"><label for="gradeFile">选择成绩文件</label><input type="file" id="gradeFile" accept=".csv, .xls, .xlsx, application/vnd.ms-excel, application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"></div>
+            <button id="importFromFileBtn">开始导入</button>
+        </div>
+        
+        <div class="section">
+            <h2>本学期考试列表</h2>
+            <table id="examListTable">
+                <thead><tr><th>考试名称</th><th>日期</th><th>科目数</th><th>操作</th></tr></thead>
+                <tbody id="examListBody"></tbody>
+            </table>
+        </div>
+        
+        <div class="section">
+            <h2>学科成绩分析</h2>
+            <div class="form-group">
+                <label for="examAnalysisSelect">选择要分析的考试</label>
+                <select id="examAnalysisSelect"><option value="">--请先选择一场考试--</option></select>
+            </div>
+            <div class="form-group">
+                <label for="subjectAnalysisSelect">选择要分析的学科</label>
+                <select id="subjectAnalysisSelect"><option value="">--再选择一个学科--</option></select>
+            </div>
+            <div id="subjectAnalysisResult"></div>
+        </div>
+
+        <div style="margin-top: 30px;"><button class="secondary" onclick="window.location.href='index.html'">返回主系统</button></div>
+    </div>
+
+    <!-- Modals -->
+    <div id="examResultsModal" class="modal"><div class="modal-content"><h2 id="examResultsTitle"></h2><div id="examResultsTableContainer" style="overflow-x:auto;"></div><div class="modal-footer"><button type="button" class="danger" onclick="document.getElementById('examResultsModal').classList.remove('show')">关闭</button></div></div></div>
+    
+    <div id="overwriteConfirmModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h2>确认覆盖</h2>
+            <p style="margin-top: 15px;">名为 "<strong id="overwriteExamName"></strong>" 的考试已存在。您确定要覆盖现有的考试和所有相关成绩吗？此操作无法撤销。</p>
+            <div class="modal-footer">
+                <button type="button" class="secondary" onclick="document.getElementById('overwriteConfirmModal').classList.remove('show')">取消</button>
+                <button id="confirmOverwriteBtn" class="danger">确认覆盖</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="db.js"></script>
+    <script src="manage_exams.js"></script>
+</body>
+</html>

@@ -1,0 +1,571 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>学生成绩与违纪记录管理系统</title>
+    <style>
+        :root { --primary-color: #2196F3; --danger-color: #f44336; }
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Microsoft YaHei', sans-serif; }
+        body { background-color: #f5f5f5; padding: 20px; }
+        .modal { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: none; align-items: center; justify-content: center; z-index: 1000; }
+        .modal.show { display: flex; }
+        .modal-content { background: white; padding: 25px; border-radius: 8px; width: 90%; max-width: 500px; box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+        .modal-footer { margin-top: 20px; display: flex; justify-content: space-between; }
+        .container { max-width: 1200px; margin: 0 auto; background-color: #fff; border-radius: 8px; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1); padding: 20px; }
+        header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid #eee; }
+        h1, h2, h3 { color: #333; }
+        .main-content { display: flex; min-height: 600px; }
+        .sidebar { width: 250px; border-right: 1px solid #eee; padding-right: 15px; }
+        .content { flex: 1; padding-left: 20px; }
+        button { background-color: #4CAF50; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-size: 14px; margin: 5px 0; transition: background-color 0.2s; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background-color: var(--primary-color); }
+        button.danger { background-color: var(--danger-color); }
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 4px; width: 100%; margin-bottom: 10px; }
+        .student-list { margin-bottom: 20px; max-height: 500px; overflow-y: auto; }
+        .student-item { padding: 10px; border: 1px solid #ddd; border-radius: 4px; margin-bottom: 5px; cursor: pointer; transition: background-color 0.2s; }
+        .student-item:hover { background-color: #f1f1f1; }
+        .student-item.active { background-color: #e3f2fd; border-color: var(--primary-color); }
+        .hidden { display: none; }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .tabs { display: flex; border-bottom: 1px solid #ddd; margin-bottom: 15px; }
+        .tab { padding: 10px 15px; cursor: pointer; }
+        .tab.active { border-bottom: 2px solid var(--primary-color); font-weight: bold; }
+        .tab-pane { display: none; }
+        .tab-pane.active { display: block; }
+        table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f8f8; }
+        tr:hover { background-color: #f5f5f5; }
+        .chart-container { height: 300px; margin: 20px 0; }
+        .record-item { display: flex; justify-content: space-between; align-items: center; padding: 10px; border: 1px solid #ddd; margin-bottom: 8px; border-radius: 4px; }
+        .record-item > div { flex-grow: 1; }
+        .record-item p { color: #666; font-size: 14px; margin-top: 4px; }
+        .warning { border-left: 4px solid #ff9800; background-color: #fff3e0; }
+        .student-header { display: flex; align-items: center; gap: 15px; margin-bottom: 10px; }
+        .content-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 15px; padding-bottom: 15px; border-bottom: 1px solid #eee; }
+        .section { margin-top: 20px; padding: 20px; border: 1px solid #eee; border-radius: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>学生成绩与违纪记录管理系统</h1>
+            <div>
+                <select id="currentSemester"></select>
+                <button id="addSemesterBtn">添加学期</button>
+            </div>
+        </header>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <h2>学生名单</h2>
+                <button id="addStudentBtn">添加学生</button>
+                <div class="student-list" id="studentList"></div>
+            </div>
+            
+            <div class="content">
+                <div class="content-header">
+                    <h2 id="contentTitle">欢迎</h2>
+                    <button id="manageExamsBtn" class="secondary">管理考试与成绩</button>
+                </div>
+
+                <div id="welcomeScreen">
+                    <p>请从左侧选择一个学生，或点击上方按钮管理考试。</p>
+                    <div class="section" style="border-color: var(--danger-color);">
+                        <h3 style="color: var(--danger-color);">高级数据操作</h3>
+                        <p>您可以导入之前导出的数据备份，或将当前所有数据导出为文件。</p>
+                        <div style="margin-top: 15px;">
+                            <input type="file" id="importFileInput" class="hidden" accept=".json">
+                            <button id="importDataBtn" class="secondary">导入数据 (JSON)</button>
+                            <button id="exportDataBtn" class="secondary">导出所有数据 (JSON)</button>
+                            <button id="clearDataBtn" class="danger">一键清除所有数据</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="studentDetail" class="hidden">
+                    <div class="student-header">
+                        <button id="editStudentBtn" class="secondary" style="font-size: 12px; padding: 5px 8px;">编辑信息</button>
+                    </div>
+                    <div class="tabs">
+                        <div class="tab active" data-tab="grades">成绩记录</div>
+                        <div class="tab" data-tab="discipline">违纪记录</div>
+                        <div class="tab" data-tab="stats">统计分析</div>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <div class="tab-pane active" id="gradesTab">
+                            <h3>学生成绩记录</h3>
+                            <table id="gradesTable">
+                                <thead><tr><th>考试名称</th><th>日期</th><th>总分</th><th>班级排名</th><th>操作</th></tr></thead>
+                                <tbody id="gradesTableBody"></tbody>
+                            </table>
+                        </div>
+                        <div class="tab-pane" id="disciplineTab">
+                             <div class="action-buttons"><button id="addDisciplineBtn">添加违纪记录</button></div>
+                             <h3>违纪记录</h3><div id="disciplineList"></div>
+                        </div>
+                        <div class="tab-pane" id="statsTab">
+                            <h3>成绩统计分析</h3>
+                            <div id="gradeChart" class="chart-container"></div>
+                            <div id="rankChart" class="chart-container"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Modals -->
+    <div id="addStudentModal" class="modal"><div class="modal-content"><h2>添加新学生</h2><div class="form-group"><label for="newStudentId">学号</label><input type="text" id="newStudentId"></div><div class="form-group"><label for="newStudentName">姓名</label><input type="text" id="newStudentName"></div><div class="form-group"><label for="newStudentGender">性别</label><select id="newStudentGender"><option value="男">男</option><option value="女">女</option></select></div><div class="modal-footer"><button id="saveNewStudent">保存</button><button type="button" class="danger" onclick="hide($('addStudentModal'))">取消</button></div></div></div>
+    <div id="editStudentModal" class="modal"><div class="modal-content"><h2>编辑学生信息</h2><div class="form-group"><label for="editStudentId">学号</label><input type="text" id="editStudentId"></div><div class="form-group"><label for="editStudentName">姓名</label><input type="text" id="editStudentName"></div><div class="form-group"><label for="editStudentGender">性别</label><select id="editStudentGender"><option value="男">男</option><option value="女">女</option></select></div><div class="modal-footer"><button id="saveEditStudent">保存更改</button><div><button type="button" class="danger" id="deleteStudentBtn">删除该学生</button><button type="button" class="secondary" onclick="hide($('editStudentModal'))" style="margin-left: 10px;">取消</button></div></div></div></div>
+    <div id="addDisciplineModal" class="modal"><div class="modal-content"><h2>添加违纪记录</h2><div class="form-group"><label for="disciplineDate">日期</label><input type="date" id="disciplineDate"></div><div class="form-group"><label for="disciplineType">违纪类型</label><select id="disciplineType"><option>迟到</option><option>早退</option><option>旷课</option><option>其他</option></select></div><div class="form-group"><label for="disciplineDescription">详细描述</label><textarea id="disciplineDescription" rows="4" style="width:100%; padding: 8px; border: 1px solid #ddd;"></textarea></div><div class="modal-footer"><button id="saveDiscipline">保存</button><button type="button" class="danger" onclick="hide($('addDisciplineModal'))">取消</button></div></div></div>
+    <div id="addSemesterModal" class="modal"><div class="modal-content"><h2>添加新学期</h2><div class="form-group"><label for="newSemesterYear">学年</label><input type="text" id="newSemesterYear" placeholder="例如：2024-2025"></div><div class="form-group"><label for="newSemesterTerm">学期</label><select id="newSemesterTerm"><option value="1">第一学期</option><option value="2">第二学期</option></select></div><div class="modal-footer"><button id="saveNewSemester">保存</button><button type="button" class="danger" onclick="hide($('addSemesterModal'))">取消</button></div></div></div>
+    <div id="gradeDetailModal" class="modal"><div class="modal-content"><h2 id="gradeDetailTitle"></h2><table id="gradeDetailTable"><thead></thead><tbody></tbody></table><div style="text-align:right; margin-top:20px;"><button type="button" class="danger" onclick="hide($('gradeDetailModal'))">关闭</button></div></div></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/idb@7/build/umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.1/chart.min.js"></script>
+    <script>
+        /**
+         * 使用 IndexedDB 数据库核心 (V5.0)
+         * 这是一个独立的模块，负责所有数据的存储和读取。
+         * 它使用 idb 库来简化 IndexedDB 的操作。
+         */
+        const DB_NAME = 'StudentDB';
+        const DB_VERSION = 1;
+        let db;
+
+        async function initDB() {
+            if (db) return;
+            db = await idb.openDB(DB_NAME, DB_VERSION, {
+                upgrade(db) {
+                    if (!db.objectStoreNames.contains('students')) {
+                        db.createObjectStore('students', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('exams')) {
+                        db.createObjectStore('exams', { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains('semesters')) {
+                        db.createObjectStore('semesters');
+                    }
+                    if (!db.objectStoreNames.contains('appState')) {
+                        db.createObjectStore('appState');
+                    }
+                },
+            });
+        }
+
+        // --- 学生数据操作 ---
+        async function getAllStudents() {
+            await initDB();
+            return db.getAll('students');
+        }
+        async function putStudent(student) {
+            await initDB();
+            return db.put('students', student);
+        }
+        async function deleteStudent(studentId) {
+            await initDB();
+            return db.delete('students', studentId);
+        }
+
+        // --- 考试数据操作 ---
+        async function getAllExams() {
+            await initDB();
+            return db.getAll('exams');
+        }
+        async function putExam(exam) {
+            await initDB();
+            return db.put('exams', exam);
+        }
+        async function deleteExam(examId) {
+            await initDB();
+            return db.delete('exams', examId);
+        }
+
+        // --- 学期数据操作 ---
+        async function getAllSemesters() {
+            await initDB();
+            const keys = await db.getAllKeys('semesters');
+            return keys.length > 0 ? keys : ["2024-2025-1"];
+        }
+        async function putSemester(semester) {
+            await initDB();
+            return db.put('semesters', semester, semester);
+        }
+
+        // --- 应用状态操作 ---
+        async function getAppState() {
+            await initDB();
+            const state = await db.get('appState', 'currentState');
+            return state || { currentSemester: "2024-2025-1" };
+        }
+        async function saveAppState(state) {
+            await initDB();
+            return db.put('appState', state, 'currentState');
+        }
+
+        // --- 高级操作 ---
+        async function exportAllData() {
+            await initDB();
+            const students = await db.getAll('students');
+            const exams = await db.getAll('exams');
+            const semesters = await db.getAllKeys('semesters');
+            const appState = await db.get('appState', 'currentState');
+
+            return {
+                students,
+                exams,
+                semesters,
+                appState,
+                exportDate: new Date().toISOString()
+            };
+        }
+
+        async function importAllData(dataToImport) {
+            await initDB();
+            if (!dataToImport || !Array.isArray(dataToImport.students) || !Array.isArray(dataToImport.exams)) {
+                throw new Error("无效的备份文件格式。");
+            }
+            
+            await clearAllData();
+
+            const importTx = db.transaction(['students', 'exams', 'semesters', 'appState'], 'readwrite');
+            const promises = [];
+            
+            dataToImport.students.forEach(student => promises.push(importTx.objectStore('students').put(student)));
+            dataToImport.exams.forEach(exam => promises.push(importTx.objectStore('exams').put(exam)));
+            (dataToImport.semesters || []).forEach(semester => promises.push(importTx.objectStore('semesters').put(semester, semester)));
+            if (dataToImport.appState) {
+                promises.push(importTx.objectStore('appState').put(dataToImport.appState, 'currentState'));
+            }
+
+            await Promise.all(promises);
+            await importTx.done;
+        }
+
+        async function clearAllData() {
+            await initDB();
+            await db.clear('students');
+            await db.clear('exams');
+            await db.clear('semesters');
+            await db.clear('appState');
+        }
+
+
+        // Main Application Logic
+        let currentStudent = null;
+        let currentSemester = "2024-2025-1";
+        let gradeChartInstance, rankChartInstance;
+        
+        const $ = id => document.getElementById(id);
+        const show = el => { if (el.classList.contains('modal')) el.classList.add('show'); else el.classList.remove('hidden'); };
+        const hide = el => { if (el.classList.contains('modal')) el.classList.remove('show'); else el.classList.add('hidden'); };
+        const formatDate = dStr => { const d = new Date(dStr); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+        
+        async function renderStudentList() {
+            const students = await getAllStudents();
+            const list = $("studentList");
+            list.innerHTML = '';
+            students.sort((a,b) => (a.id||'').localeCompare(b.id||'')).forEach(s => {
+                const item = document.createElement("div");
+                item.className = "student-item";
+                if (currentStudent && s.id === currentStudent.id) item.classList.add("active");
+                item.innerHTML = `<strong>${s.name}</strong> (${s.id})`;
+                item.onclick = () => selectStudent(s);
+                list.appendChild(item);
+            });
+        }
+        
+        async function renderSemesterSelector() {
+            const semesters = await getAllSemesters();
+            const selector = $("currentSemester");
+            selector.innerHTML = '';
+            semesters.sort().reverse().forEach(sem => {
+                const lastHyphen = sem.lastIndexOf('-');
+                const year = sem.substring(0, lastHyphen);
+                const term = sem.substring(lastHyphen + 1);
+                selector.add(new Option(`${year}学年第${term}学期`, sem));
+            });
+            selector.value = currentSemester;
+        }
+
+        function selectStudent(student) {
+            if (currentStudent && currentStudent.id === student.id) {
+                resetToWelcome();
+                return;
+            }
+
+            currentStudent = student;
+            if (!currentStudent) return;
+            hide($("welcomeScreen"));
+            show($("studentDetail"));
+            $("contentTitle").innerHTML = `${currentStudent.name} <span style="font-size: 1rem; color: #666;">(${currentStudent.id})</span>`;
+            renderAllTabs();
+            renderStudentList();
+        }
+
+        function resetToWelcome() {
+            currentStudent = null;
+            hide($('studentDetail'));
+            show($('welcomeScreen'));
+            $('contentTitle').textContent = '欢迎';
+            renderStudentList();
+        }
+
+        function renderAllTabs() {
+            renderGradesTable();
+            renderDisciplineRecords();
+            renderStatistics();
+        }
+
+        function renderGradesTable() {
+            const body = $("gradesTableBody");
+            body.innerHTML = '';
+            if (!currentStudent) return;
+            const grades = (currentStudent.grades || []).filter(g => g.semester === currentSemester);
+            if (grades.length === 0) { body.innerHTML = '<tr><td colspan="5" style="text-align: center;">本学期暂无成绩记录</td></tr>'; return; }
+            grades.sort((a, b) => new Date(b.date) - new Date(a.date)).forEach(grade => {
+                const totalScore = grade.explicitTotalScore ?? (grade.subjects || []).reduce((sum, s) => sum + (Number(s.score) || 0), 0);
+                const row = body.insertRow();
+                row.innerHTML = `<td>${grade.examName}</td><td>${formatDate(grade.date)}</td><td>${totalScore.toFixed(1)}</td><td>${grade.rank || 'N/A'}</td><td><button class="secondary" onclick="showGradeDetails('${grade.examId}')">查看详情</button></td>`;
+            });
+        }
+
+        async function showGradeDetails(examId) {
+            const grade = currentStudent.grades.find(g => g.examId === examId);
+            if (!grade) return;
+            const studentTotalRank = grade.rank;
+            const allStudents = await getAllStudents();
+
+            const allGradesForThisExam = allStudents.map(student => ({
+                studentId: student.id,
+                grade: (student.grades || []).find(g => g.examId === examId)
+            })).filter(entry => entry.grade);
+
+            $('gradeDetailTitle').textContent = `${grade.examName} - 成绩详情与偏科分析`;
+            const table = $('gradeDetailTable');
+            table.querySelector('thead').innerHTML = `<tr><th>科目</th><th>分数</th><th>学科排名</th><th>偏科指数</th></tr>`;
+            const tableBody = table.querySelector('tbody');
+            tableBody.innerHTML = '';
+
+            (grade.subjects || []).forEach(currentSubject => {
+                const scoresForThisSubject = allGradesForThisExam.map(entry => {
+                    const subjectGrade = (entry.grade.subjects || []).find(s => s.name === currentSubject.name);
+                    return { studentId: entry.studentId, score: subjectGrade ? Number(subjectGrade.score) : -1 };
+                });
+                scoresForThisSubject.sort((a, b) => b.score - a.score);
+                const subjectRank = scoresForThisSubject.findIndex(s => s.studentId === currentStudent.id) + 1;
+
+                let partialityHtml = 'N/A';
+                if (studentTotalRank && subjectRank > 0) {
+                    const partialityIndex = subjectRank - studentTotalRank;
+                    let color = partialityIndex === 0 ? 'gray' : (partialityIndex > 0 ? 'red' : 'green');
+                    let sign = partialityIndex > 0 ? '+' : '';
+                    partialityHtml = `<span style="color:${color}; font-weight:bold;">${sign}${partialityIndex}</span>`;
+                }
+                tableBody.innerHTML += `<tr><td>${currentSubject.name}</td><td>${currentSubject.score}</td><td>${subjectRank > 0 ? subjectRank : 'N/A'}</td><td>${partialityHtml}</td></tr>`;
+            });
+
+            const totalScore = grade.explicitTotalScore ?? (grade.subjects || []).reduce((sum, s) => sum + (Number(s.score) || 0), 0);
+            tableBody.innerHTML += `<tr style="font-weight:bold; background-color: #f8f8f8;"><td>总分</td><td>${totalScore.toFixed(1)}</td><td>${studentTotalRank || 'N/A'}</td><td>--</td></tr>`;
+            show($('gradeDetailModal'));
+        }
+
+        function renderDisciplineRecords() {
+            const list = $("disciplineList");
+            list.innerHTML = '';
+            if (!currentStudent) return;
+            const records = (currentStudent.disciplineRecords || []).filter(r => r.semester === currentSemester);
+            if (records.length === 0) { list.innerHTML = '<p>本学期暂无违纪记录。</p>'; return; }
+            records.sort((a,b) => new Date(b.date) - new Date(a.date)).forEach(rec => {
+                const item = document.createElement('div');
+                item.className = 'record-item warning';
+                item.innerHTML = `<div><h4>${rec.type} - ${formatDate(rec.date)}</h4><p>${rec.description}</p></div><button class="danger" onclick="deleteDiscipline('${rec.id}')">删除</button>`;
+                list.appendChild(item);
+            });
+        }
+
+        function renderStatistics() {
+            if (gradeChartInstance) gradeChartInstance.destroy();
+            if (rankChartInstance) rankChartInstance.destroy();
+            $('gradeChart').innerHTML = '';
+            $('rankChart').innerHTML = '';
+            
+            if (!currentStudent) return;
+
+            const grades = (currentStudent.grades || []).filter(g => g.semester === currentSemester).sort((a,b) => new Date(a.date) - new Date(b.date));
+            if (grades.length < 2) {
+                $('gradeChart').innerHTML = '<p style="text-align:center; padding-top: 50px;">至少需要两次成绩才能生成图表。</p>';
+                return;
+            }
+            
+            const labels = grades.map(g => g.examName);
+            const scores = grades.map(g => g.explicitTotalScore ?? (g.subjects || []).reduce((sum, s) => sum + (Number(s.score) || 0), 0));
+            
+            gradeChartInstance = new Chart($('gradeChart').appendChild(document.createElement('canvas')), {
+                type: 'line',
+                data: { labels, datasets: [{ label: '总分趋势', data: scores, borderColor: 'rgb(75, 192, 192)', tension: 0.1 }] },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+            
+            const rankedGrades = grades.filter(g => g.rank && g.rank > 0);
+            if(rankedGrades.length > 1) {
+                const rankLabels = rankedGrades.map(g => g.examName);
+                const ranks = rankedGrades.map(g => g.rank);
+                rankChartInstance = new Chart($('rankChart').appendChild(document.createElement('canvas')), {
+                    type: 'line',
+                    data: { labels: rankLabels, datasets: [{ label: '排名趋势', data: ranks, borderColor: 'rgb(255, 99, 132)', tension: 0.1 }] },
+                    options: { responsive: true, maintainAspectRatio: false, scales: { y: { reverse: true, beginAtZero: false } } }
+                });
+            }
+        }
+        
+        async function deleteDiscipline(recordId) {
+            if (confirm("确定要删除这条违纪记录吗？")) {
+                currentStudent.disciplineRecords = (currentStudent.disciplineRecords || []).filter(r => r.id !== recordId);
+                await putStudent(currentStudent);
+                renderDisciplineRecords();
+            }
+        }
+        
+        function setupEventListeners() {
+            $("manageExamsBtn").onclick = () => window.location.href = `manage_exams.html?semester=${currentSemester}`;
+            document.querySelectorAll(".tab").forEach(tab => tab.addEventListener("click", () => {
+                document.querySelectorAll(".tab, .tab-pane").forEach(el => el.classList.remove("active"));
+                tab.classList.add("active");
+                $(`${tab.dataset.tab}Tab`).classList.add("active");
+            }));
+            
+            $("addStudentBtn").onclick = () => { $("newStudentId").value = ''; $("newStudentName").value = ''; show($("addStudentModal")); };
+            $("saveNewStudent").onclick = async () => {
+                const id = $("newStudentId").value.trim(), name = $("newStudentName").value.trim();
+                if (!id || !name) return alert("学号和姓名不能为空");
+                const students = await getAllStudents();
+                if (students.some(s => s.id === id)) return alert("学号已存在");
+                const newStudent = { id, name, gender: $("newStudentGender").value, grades: [], disciplineRecords: [] };
+                await putStudent(newStudent);
+                renderStudentList(); hide($("addStudentModal"));
+            };
+
+            $("editStudentBtn").onclick = () => {
+                if(!currentStudent) return;
+                $('editStudentId').value = currentStudent.id;
+                $('editStudentName').value = currentStudent.name;
+                $('editStudentGender').value = currentStudent.gender;
+                show($('editStudentModal'));
+            };
+            $("saveEditStudent").onclick = async () => {
+                const newId = $('editStudentId').value.trim();
+                const newName = $('editStudentName').value.trim();
+                if(!newName || !newId) return alert("学号和姓名不能为空");
+                if (newId !== currentStudent.id) {
+                    const students = await getAllStudents();
+                    if (students.some(s => s.id === newId)) return alert("修改后的学号已存在。");
+                }
+                currentStudent.id = newId;
+                currentStudent.name = newName;
+                currentStudent.gender = $('editStudentGender').value;
+                await putStudent(currentStudent);
+                selectStudent(currentStudent);
+                hide($('editStudentModal'));
+            };
+            $("deleteStudentBtn").onclick = async () => {
+                if (!currentStudent) return;
+                if (confirm(`确定要永久删除学生 "${currentStudent.name}" 吗？`)) {
+                    await deleteStudent(currentStudent.id);
+                    hide($('editStudentModal'));
+                    resetToWelcome();
+                }
+            };
+            
+            $("addDisciplineBtn").onclick = () => { $("disciplineDate").valueAsDate = new Date(); $("disciplineDescription").value = ''; show($("addDisciplineModal")); };
+            $("saveDiscipline").onclick = async () => {
+                const newRecord = { id: Date.now().toString(), date: $("disciplineDate").value, type: $("disciplineType").value, description: $("disciplineDescription").value.trim(), semester: currentSemester };
+                if (!newRecord.date || !newRecord.description) return alert("日期和描述不能为空");
+                if (!currentStudent.disciplineRecords) currentStudent.disciplineRecords = [];
+                currentStudent.disciplineRecords.push(newRecord);
+                await putStudent(currentStudent);
+                renderDisciplineRecords(); hide($("addDisciplineModal"));
+            };
+            
+            $("addSemesterBtn").onclick = () => { $("newSemesterYear").value = ''; show($("addSemesterModal")); };
+            $("saveNewSemester").onclick = async () => {
+                const year = $("newSemesterYear").value.trim(), term = $("newSemesterTerm").value;
+                if (!/^\d{4}-\d{4}$/.test(year)) return alert("学年格式应为 e.g., 2024-2025");
+                const semesterId = `${year}-${term}`;
+                const semesters = await getAllSemesters();
+                if (semesters.includes(semesterId)) return alert("该学期已存在");
+                await putSemester(semesterId);
+                currentSemester = semesterId;
+                await saveAppState({ currentSemester });
+                await renderSemesterSelector(); hide($("addSemesterModal"));
+            };
+            $("currentSemester").onchange = async function() { 
+                currentSemester = this.value;
+                await saveAppState({ currentSemester });
+                if (currentStudent) renderAllTabs();
+            };
+            
+            $('importDataBtn').onclick = () => $('importFileInput').click();
+            $('importFileInput').onchange = (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    try {
+                        const importedData = JSON.parse(e.target.result);
+                        if (!importedData || !importedData.students || !importedData.exams) throw new Error("文件内容格式不正确。");
+                        if (confirm("警告：导入数据将覆盖当前所有记录，此操作不可撤销。\n您确定要继续吗？")) {
+                            await importAllData(importedData);
+                            alert("数据导入成功！页面将刷新以应用更改。");
+                            window.location.reload();
+                        }
+                    } catch (err) { alert(`导入失败: ${err.message}`); } 
+                    finally { event.target.value = ''; }
+                };
+                reader.readAsText(file);
+            };
+            $('exportDataBtn').onclick = async () => {
+                try {
+                    const allData = await exportAllData();
+                    const jsonString = JSON.stringify(allData, null, 2);
+                    const blob = new Blob([jsonString], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `student-data-backup-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.json`;
+                    a.click();
+                    URL.revokeObjectURL(url);
+                } catch (error) { alert("数据导出失败！"); }
+            };
+            $('clearDataBtn').onclick = async () => {
+                if (confirm("警告：您确定要永久清除所有数据吗？此操作无法撤销！") && 
+                    prompt("为确认此操作，请输入 '确认清除' ") === "确认清除") {
+                    try {
+                        await clearAllData();
+                        alert("所有数据已被清除。页面将刷新。");
+                        window.location.reload();
+                    } catch (error) { alert("清除数据失败！"); }
+                }
+            };
+        }
+        
+        window.addEventListener("DOMContentLoaded", async () => {
+            await initDB();
+            const appState = await getAppState();
+            currentSemester = appState.currentSemester;
+            const students = await getAllStudents();
+            if (students.length === 0) {
+                await putStudent({ id: "S001", name: "张三", gender: "男", grades: [], disciplineRecords: [] });
+            }
+            await renderStudentList();
+            await renderSemesterSelector();
+            setupEventListeners();
+        });
+    </script>
+</body>
+</html>
